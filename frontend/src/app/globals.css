@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+:root {
+  --rojo: #C8102E;
+  --rojo-dark: #8B0000;
+  --negro: #1a1a1a;
+}
+
+* { box-sizing: border-box; }
+body { background: #f4f4f4; font-family: system-ui, sans-serif; margin: 0; }
