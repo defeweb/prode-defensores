@@ -16,13 +16,17 @@ import { DashboardModule } from './dashboard/dashboard.module';
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         type: 'mysql',
-        host:     config.get('DB_HOST'),
-        port:     config.get<number>('DB_PORT'),
+        host: config.get('DB_HOST'),
+        port: config.get<number>('DB_PORT'),
         username: config.get('DB_USER'),
         password: config.get('DB_PASSWORD'),
         database: config.get('DB_NAME'),
         autoLoadEntities: true,
-        synchronize: true, // solo desarrollo, en prod usar migrations
+        synchronize: true,
+        connectTimeout: 30000,
+        extra: {
+          socketPath: config.get('DB_SOCKET') || undefined,
+        },
       }),
       inject: [ConfigService],
     }),
