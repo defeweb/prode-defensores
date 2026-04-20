@@ -6,6 +6,12 @@ import { Matchday } from './matchday.entity';
 import { ScoringService } from '../scoring/scoring.service';
 import axios from 'axios';
 
+const SOFASCORE_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json',
+  'Referer': 'https://www.sofascore.com/',
+};
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
@@ -16,57 +22,78 @@ export class SyncService {
     private scoringService: ScoringService,
   ) {}
 
-  async syncResultados(): Promise<{ actualizados: number; errores: string[] }> {
-    this.logger.log('Iniciando sincronización de resultados...');
+  async syncResultados(): Promise<{ actualizados: number; errores: string[]; detalle: string[] }> {
+    this.logger.log('Iniciando sincronización con Sofascore...');
     const errores: string[] = [];
+    const detalle: string[] = [];
     let actualizados = 0;
 
     try {
-      // API interna de Promiedos para Primera Nacional (ebj)
-      const response = await axios.get('https://api.promiedos.com.ar/league/ebj/fixtures', {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://www.promiedos.com.ar/',
-          'Accept': 'application/json',
-        },
-        timeout: 10000,
-      });
+      // Obtener todas las fechas del torneo Primera Nacional 2026 (ID 703, season 2026)
+      const seasonsRes = await axios.get(
+        'https://api.sofascore.com/api/v1/unique-tournament/703/seasons',
+        { headers: SOFASCORE_HEADERS, timeout: 10000 }
+      );
 
-      const data = response.data;
-      if (!data || !data.dates) {
-        errores.push('No se pudo obtener datos de Promiedos');
-        return { actualizados, errores };
+      const seasons = seasonsRes.data?.seasons || [];
+      const season2026 = seasons.find((s: any) =>
+        s.year === '2026' || s.name?.includes('2026')
+      );
+
+      if (!season2026) {
+        errores.push('No se encontró la temporada 2026 en Sofascore');
+        return { actualizados, errores, detalle };
       }
 
-      for (const fecha of data.dates) {
-        const nroFecha = fecha.date_number;
+      const seasonId = season2026.id;
+      this.logger.log('Season ID 2026: ' + seasonId);
+
+      // Obtener rondas disponibles
+      const roundsRes = await axios.get(
+        'https://api.sofascore.com/api/v1/unique-tournament/703/season/' + seasonId + '/rounds',
+        { headers: SOFASCORE_HEADERS, timeout: 10000 }
+      );
+
+      const rounds = roundsRes.data?.rounds || [];
+      this.logger.log('Rondas encontradas: ' + rounds.length);
+
+      for (const round of rounds) {
+        const nroFecha = round.round;
         if (!nroFecha) continue;
 
-        const matchday = await this.matchdaysRepo.findOne({ where: { numero: nroFecha, seasonId: 1 } });
+        const matchday = await this.matchdaysRepo.findOne({
+          where: { numero: nroFecha, seasonId: 1 }
+        });
         if (!matchday) continue;
 
-        for (const partido of fecha.matches || []) {
-          if (partido.status !== 'FT') continue; // solo finalizados
+        // Obtener partidos de esta ronda
+        const eventsRes = await axios.get(
+          'https://api.sofascore.com/api/v1/unique-tournament/703/season/' + seasonId + '/events/round/' + nroFecha,
+          { headers: SOFASCORE_HEADERS, timeout: 10000 }
+        );
 
-          const golesLocal    = parseInt(partido.score?.home ?? -1);
-          const golesVisitante = parseInt(partido.score?.away ?? -1);
-          if (isNaN(golesLocal) || isNaN(golesVisitante)) continue;
+        const events = eventsRes.data?.events || [];
 
-          const localNorm   = this.normalizar(partido.home?.name ?? '');
-          const visitaNorm  = this.normalizar(partido.away?.name ?? '');
+        for (const event of events) {
+          if (event.status?.type !== 'finished') continue;
 
-          const match = await this.matchesRepo
-            .createQueryBuilder('m')
-            .where('m.matchdayId = :mdId', { mdId: matchday.id })
-            .andWhere('m.estado != :estado', { estado: 'finalizado' })
-            .getMany();
+          const golesLocal    = event.homeScore?.current;
+          const golesVisitante = event.awayScore?.current;
+          if (golesLocal === undefined || golesVisitante === undefined) continue;
 
-          const encontrado = match.find(m =>
-            this.normalizar(m.equipoLocal).includes(localNorm) ||
-            localNorm.includes(this.normalizar(m.equipoLocal)) ||
-            this.normalizar(m.equipoVisitante).includes(visitaNorm) ||
-            visitaNorm.includes(this.normalizar(m.equipoVisitante))
-          );
+          const localSofa  = this.normalizar(event.homeTeam?.name || '');
+          const visitaSofa = this.normalizar(event.awayTeam?.name || '');
+
+          // Buscar partido pendiente en nuestra DB
+          const pendientes = await this.matchesRepo.find({
+            where: { matchdayId: matchday.id, estado: 'pendiente' }
+          });
+
+          const encontrado = pendientes.find(m => {
+            const localDB  = this.normalizar(m.equipoLocal);
+            const visitaDB = this.normalizar(m.equipoVisitante);
+            return this.similares(localDB, localSofa) && this.similares(visitaDB, visitaSofa);
+          });
 
           if (encontrado) {
             await this.matchesRepo.update(encontrado.id, {
@@ -74,30 +101,48 @@ export class SyncService {
               golesVisitante,
               estado: 'finalizado',
             });
-            // Disparar scoring
+
             setImmediate(() => {
               this.scoringService.calculateForMatch(encontrado.id).catch(err =>
                 this.logger.error('Error scoring', err)
               );
             });
+
+            const msg = 'F' + nroFecha + ': ' + encontrado.equipoLocal + ' ' + golesLocal + '-' + golesVisitante + ' ' + encontrado.equipoVisitante;
+            detalle.push(msg);
+            this.logger.log('✓ ' + msg);
             actualizados++;
-            this.logger.log('Actualizado: ' + encontrado.equipoLocal + ' ' + golesLocal + '-' + golesVisitante + ' ' + encontrado.equipoVisitante);
           }
         }
+
+        // Pequeña pausa para no saturar la API
+        await new Promise(r => setTimeout(r, 300));
       }
+
     } catch (err: any) {
       this.logger.error('Error sync: ' + err.message);
-      errores.push('Error conectando con Promiedos: ' + err.message);
+      errores.push('Error: ' + err.message);
     }
 
-    return { actualizados, errores };
+    return { actualizados, errores, detalle };
   }
 
   private normalizar(str: string): string {
     return str.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/[.\-()]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private similares(a: string, b: string): boolean {
+    if (a === b) return true;
+    if (a.includes(b) || b.includes(a)) return true;
+
+    // Palabras clave en común
+    const wordsA = a.split(' ').filter(w => w.length > 3);
+    const wordsB = b.split(' ').filter(w => w.length > 3);
+    const comunes = wordsA.filter(w => wordsB.some(wb => wb.includes(w) || w.includes(wb)));
+    return comunes.length >= 1;
   }
 }
