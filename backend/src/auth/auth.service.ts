@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './auth.dto';
@@ -22,14 +22,17 @@ export class AuthService {
     if (exists) throw new BadRequestException('El email ya está registrado');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = await this.users.create({
+    await this.users.create({
       nombre: dto.nombre,
       email: dto.email,
       passwordHash,
       nroSocio: dto.nroSocio,
+      activo: false, // pendiente de aprobación
     });
 
-    return this.generateToken(user);
+    return {
+      message: 'Registro exitoso. Tu cuenta está pendiente de aprobación por el administrador. Te avisaremos cuando esté habilitada.',
+    };
   }
 
   async login(dto: LoginDto) {
@@ -39,24 +42,27 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Credenciales incorrectas');
 
+    if (!user.activo && user.rol !== 'admin') {
+      throw new ForbiddenException('Tu cuenta está pendiente de aprobación. Contactá al administrador.');
+    }
+
     return this.generateToken(user);
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.users.findByEmail(dto.email);
-    if (!user) return; // silencioso
+    if (!user) return;
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hash = await bcrypt.hash(rawToken, 10);
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.users.update(user.id, {
       resetToken: hash,
       resetTokenExpiry: expiry,
     });
 
-    // TODO: enviar email con SendGrid cuando tengamos la API key
-    console.log(`🔑 Token de reset para ${user.email}: ${rawToken}`);
+    console.log('Token de reset para ' + user.email + ': ' + rawToken);
   }
 
   async resetPassword(dto: ResetPasswordDto) {

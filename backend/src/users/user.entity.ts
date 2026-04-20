@@ -2,8 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeor
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn() id: number;
 
   @Column({ type: 'varchar', length: 100 })
   nombre: string;
@@ -14,11 +13,14 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   passwordHash: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
-  nroSocio: string | null;
+  @Column({ type: 'varchar', length: 20, nullable: false })
+  nroSocio: string;
 
   @Column({ type: 'enum', enum: ['socio', 'admin'], default: 'socio' })
   rol: string;
+
+  @Column({ type: 'boolean', default: false })
+  activo: boolean;
 
   @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   resetToken: string | null;
