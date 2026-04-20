@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { MatchesService } from './matches.service';
+import { SyncService } from './sync.service';
 import { CreateMatchDto, SetResultDto, CreateMatchdayDto } from './matches.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -7,9 +8,11 @@ import { AdminGuard } from '../common/guards/admin.guard';
 @Controller('matches')
 @UseGuards(JwtAuthGuard)
 export class MatchesController {
-  constructor(private svc: MatchesService) {}
+  constructor(
+    private svc: MatchesService,
+    private syncSvc: SyncService,
+  ) {}
 
-  // Público (con JWT): ver partidos
   @Get()
   findByMatchday(@Query('matchdayId', ParseIntPipe) matchdayId: number) {
     return this.svc.findByMatchday(matchdayId);
@@ -25,7 +28,6 @@ export class MatchesController {
     return this.svc.findAllMatchdays();
   }
 
-  // Solo admin: crear y cargar resultados
   @Post()
   @UseGuards(AdminGuard)
   create(@Body() dto: CreateMatchDto) {
@@ -42,5 +44,11 @@ export class MatchesController {
   @UseGuards(AdminGuard)
   setResult(@Param('id', ParseIntPipe) id: number, @Body() dto: SetResultDto) {
     return this.svc.setResult(id, dto);
+  }
+
+  @Post('sync')
+  @UseGuards(AdminGuard)
+  syncResultados() {
+    return this.syncSvc.syncResultados();
   }
 }

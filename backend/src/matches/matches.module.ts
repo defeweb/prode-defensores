@@ -4,6 +4,7 @@ import { Match } from './match.entity';
 import { Matchday } from './matchday.entity';
 import { MatchesService } from './matches.service';
 import { MatchesController } from './matches.controller';
+import { SyncService } from './sync.service';
 import { ScoringModule } from '../scoring/scoring.module';
 
 @Module({
@@ -12,7 +13,7 @@ import { ScoringModule } from '../scoring/scoring.module';
     ScoringModule,
   ],
   controllers: [MatchesController],
-  providers: [MatchesService],
+  providers: [MatchesService, SyncService],
   exports: [MatchesService],
 })
 export class MatchesModule {}

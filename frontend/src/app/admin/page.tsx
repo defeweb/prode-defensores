@@ -29,6 +29,8 @@ export default function AdminPage() {
   const [ptsRes, setPtsRes] = useState(1);
   const [ptsExacto, setPtsExacto] = useState(3);
   const [rulesMsg, setRulesMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
   useEffect(() => {
     if (!getToken() || !isAdmin()) { router.push('/dashboard'); return; }
@@ -118,6 +120,20 @@ export default function AdminPage() {
       setRulesMsg('✓ Reglas actualizadas');
       setTimeout(() => setRulesMsg(''), 2500);
     } catch {}
+  }
+
+  async function syncResultados() {
+    setSyncing(true); setSyncMsg('');
+    try {
+      const { data } = await api.post('/matches/sync');
+      setSyncMsg('✓ Sincronizados ' + data.actualizados + ' resultados' + (data.errores?.length ? ' · ' + data.errores[0] : ''));
+      if (selectedMd) loadMatches(selectedMd);
+    } catch (e: any) {
+      setSyncMsg('Error: ' + (e.response?.data?.message || 'Error de conexión'));
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(''), 5000);
+    }
   }
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' as const };
@@ -252,6 +268,7 @@ export default function AdminPage() {
           <div style={{ background: 'white', borderRadius: 10, border: '1px solid #eee' }}>
             <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>Cargar resultados</span>
+              <button onClick={syncResultados} disabled={syncing} style={{ fontSize: 13, background: syncing ? '#999' : '#1a7a3c', color: 'white', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: syncing ? 'default' : 'pointer', fontWeight: 700 }}>{syncing ? 'Sincronizando...' : '⟳ Sync Promiedos'}</button>
               <select value={selectedMd ?? ''} onChange={e => setSelectedMd(+e.target.value)}
                 style={{ fontSize: 13, border: '1px solid #ddd', borderRadius: 6, padding: '4px 10px', outline: 'none' }}>
                 {matchdays.map((md: any) => <option key={md.id} value={md.id}>Fecha {md.numero}</option>)}
@@ -311,3 +328,4 @@ export default function AdminPage() {
     </>
   );
 }
+// Este archivo fue actualizado - ver versión completa
