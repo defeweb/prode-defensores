@@ -22,7 +22,8 @@ export default function LoginPage() {
       saveAuth(data.access_token, data.user);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión');
+      const msg = err.response?.data?.message || 'Error al iniciar sesión';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -31,7 +32,7 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f4f4' }}>
       <div style={{ background: 'white', borderRadius: 12, padding: 32, width: '100%', maxWidth: 400 }}>
-        
+
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#C8102E', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 18, color: 'white', fontWeight: 700 }}>
             DB
@@ -49,40 +50,30 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 13, color: '#444', display: 'block', marginBottom: 4 }}>Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-            />
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           </div>
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 8 }}>
             <label style={{ fontSize: 13, color: '#444', display: 'block', marginBottom: 4 }}>Contraseña</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-            />
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ width: '100%', padding: 11, background: '#C8102E', color: 'white', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
-          >
+          <div style={{ textAlign: 'right', marginBottom: 20 }}>
+            <Link href="/recuperar-password" style={{ fontSize: 13, color: '#C8102E', fontWeight: 600 }}>
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+          <button type="submit" disabled={loading}
+            style={{ width: '100%', padding: 11, background: '#C8102E', color: 'white', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: '#666' }}>
           ¿No tenés cuenta?{' '}
-          <Link href="/registro" style={{ color: '#C8102E', fontWeight: 600 }}>
-            Registrate
-          </Link>
+          <Link href="/registro" style={{ color: '#C8102E', fontWeight: 600 }}>Registrate</Link>
         </p>
       </div>
     </div>
