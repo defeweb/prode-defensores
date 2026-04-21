@@ -32,7 +32,7 @@ export class SyncService {
       // API-Football - Liga Primera Nacional Argentina ID: 128
       const response = await axios.get('https://v3.football.api-sports.io/fixtures', {
         params: {
-          league: 128,
+          league: 129,
           season: 2026,
           status: 'FT', // solo finalizados
         },

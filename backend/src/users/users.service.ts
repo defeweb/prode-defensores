@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -12,7 +13,10 @@ export class UsersService {
   }
 
   findById(id: number) {
-    return this.repo.findOne({ where: { id } });
+    return this.repo.findOne({
+      where: { id },
+      select: ['id', 'nombre', 'email', 'nroSocio', 'rol', 'activo', 'createdAt'],
+    });
   }
 
   findPending() {
@@ -36,6 +40,15 @@ export class UsersService {
 
   update(id: number, data: Partial<User>) {
     return this.repo.update(id, data);
+  }
+
+  async updateProfile(id: number, dto: { nombre?: string; nroSocio?: string; password?: string }) {
+    const data: Partial<User> = {};
+    if (dto.nombre)   data.nombre   = dto.nombre;
+    if (dto.nroSocio) data.nroSocio = dto.nroSocio;
+    if (dto.password) data.passwordHash = await bcrypt.hash(dto.password, 12);
+    await this.repo.update(id, data);
+    return this.findById(id);
   }
 
   async aprobar(id: number) {
