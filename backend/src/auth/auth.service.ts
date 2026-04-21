@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException, ForbiddenExcept
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './auth.dto';
+import { MailService } from './mail.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { MoreThan } from 'typeorm';
@@ -14,6 +15,7 @@ export class AuthService {
   constructor(
     private users: UsersService,
     private jwt: JwtService,
+    private mail: MailService,
     @InjectRepository(User) private usersRepo: Repository<User>,
   ) {}
 
@@ -27,7 +29,7 @@ export class AuthService {
       email: dto.email,
       passwordHash,
       nroSocio: dto.nroSocio,
-      activo: false, // pendiente de aprobación
+      activo: false,
     });
 
     return {
@@ -62,7 +64,7 @@ export class AuthService {
       resetTokenExpiry: expiry,
     });
 
-    console.log('Token de reset para ' + user.email + ': ' + rawToken);
+    await this.mail.sendPasswordReset(user.email, rawToken);
   }
 
   async resetPassword(dto: ResetPasswordDto) {
